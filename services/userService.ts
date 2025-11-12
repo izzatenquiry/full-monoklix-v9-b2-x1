@@ -57,6 +57,7 @@ const mapProfileToUser = (
     appVersion: profile.app_version || undefined,
     personalAuthToken: profile.personal_auth_token || undefined,
     proxyServer: profile.proxy_server || undefined,
+    batch_02: profile.batch_02 || undefined,
   };
 };
 
@@ -217,6 +218,7 @@ export const replaceUsers = async (importedUsers: User[]): Promise<{ success: bo
             webhook_url: user.webhookUrl || null,
             total_image: user.totalImage || 0,
             total_video: user.totalVideo || 0,
+            batch_02: user.batch_02 || null,
         }));
         
         // FIX: Use the correct table name 'users'.

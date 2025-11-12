@@ -100,6 +100,7 @@ export interface User {
   appVersion?: string;
   personalAuthToken?: string | null;
   proxyServer?: string | null;
+  batch_02?: string | null;
 }
 
 export type LoginResult = { success: true; user: User } | { success: false; message: string };

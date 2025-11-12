@@ -142,6 +142,55 @@ const AssigningTokenModal: React.FC<AssigningTokenModalProps> = ({ status, error
     );
 };
 
+interface ServerSelectionModalProps {
+  isOpen: boolean;
+  servers: string[];
+  serverUsage: Record<string, number>;
+  onSelect: (serverUrl: string) => void;
+}
+
+const ServerSelectionModal: React.FC<ServerSelectionModalProps> = ({ isOpen, servers, serverUsage, onSelect }) => {
+    const T = getTranslations().serverSelectionModal;
+
+    const getUsageColor = (count: number) => {
+        if (count < 10) return 'text-green-500';
+        if (count < 20) return 'text-yellow-500';
+        return 'text-red-500';
+    };
+    
+    if (!isOpen) return null;
+
+    return (
+        <div className="fixed inset-0 bg-neutral-100 dark:bg-neutral-900 flex items-center justify-center p-4 z-50 animate-zoomIn">
+            <div className="w-full max-w-2xl text-center">
+                <h1 className="text-3xl font-bold mb-2">{T.title}</h1>
+                <p className="text-neutral-500 dark:text-neutral-400 mb-8">{T.subtitle}</p>
+
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                    {servers.map(serverUrl => {
+                        const usage = serverUsage[serverUrl] || 0;
+                        const serverName = serverUrl.replace('https://', '').replace('.monoklix.com', '');
+                        return (
+                            <button
+                                key={serverUrl}
+                                onClick={() => onSelect(serverUrl)}
+                                className="p-6 bg-white dark:bg-neutral-800 rounded-lg shadow-md border border-transparent hover:border-primary-500 hover:shadow-xl transform hover:-translate-y-1 transition-all"
+                            >
+                                <ServerIcon className="w-10 h-10 mx-auto text-primary-500 mb-3" />
+                                <p className="font-bold text-lg capitalize">{T.server} {serverName.toUpperCase()}</p>
+                                <div className={`flex items-center justify-center gap-2 text-sm mt-1 font-semibold ${getUsageColor(usage)}`}>
+                                    <UsersIcon className="w-4 h-4" />
+                                    <span>{usage} Users</span>
+                                </div>
+                            </button>
+                        );
+                    })}
+                </div>
+            </div>
+        </div>
+    );
+};
+
 
 const App: React.FC = () => {
   const [sessionChecked, setSessionChecked] = useState(false);
@@ -167,6 +216,8 @@ const App: React.FC = () => {
   const [scanProgress, setScanProgress] = useState({ current: 0, total: 0 });
   const [autoAssignError, setAutoAssignError] = useState<string | null>(null);
   const [notification, setNotification] = useState<string | null>(null);
+  const [showServerModal, setShowServerModal] = useState(false);
+  const [serverOptions, setServerOptions] = useState<{ servers: string[], usage: Record<string, number> }>({ servers: [], usage: {} });
   
   // FIX: Correctly access translations via `app` key.
   const T = getTranslations().app;
@@ -533,6 +584,23 @@ const App: React.FC = () => {
 
         runAssignment();
     }, [needsTokenAssignment, currentUser, assignTokenProcess]);
+  
+  const proceedWithPostLoginFlow = (user: User) => {
+    if (user && !user.personalAuthToken) {
+        setNeedsTokenAssignment(true);
+    } else {
+        setJustLoggedIn(true);
+    }
+  };
+  
+  const handleServerSelected = (serverUrl: string) => {
+    if (!currentUser) return;
+    console.log(`[Session] User selected server: ${serverUrl}`);
+    sessionStorage.setItem('selectedProxyServer', serverUrl);
+    updateUserProxyServer(currentUser.id, serverUrl); // fire-and-forget
+    setShowServerModal(false);
+    proceedWithPostLoginFlow(currentUser);
+  };
 
   const handleLoginSuccess = async (user: User) => {
     handleUserUpdate(user);
@@ -542,55 +610,39 @@ const App: React.FC = () => {
     // Load all necessary session data immediately after login.
     await initializeSessionData(user.id);
     
-    // Auto-select the best proxy server for the user.
+    // Server selection logic
     if (user.role === 'admin') {
         console.log("[Admin User] Assigning to dedicated admin server s10.monoklix.com");
         const adminServer = 'https://s10.monoklix.com';
         sessionStorage.setItem('selectedProxyServer', adminServer);
         updateUserProxyServer(user.id, adminServer); // Fire-and-forget
+        proceedWithPostLoginFlow(user);
     } else if (window.location.hostname === 'localhost') {
         console.log("[Local Development] Skipping server selection.");
+        proceedWithPostLoginFlow(user);
     } else {
-        console.log("[Production] Auto-selecting best server via load balancer for user...");
+        console.log("[Production] Waiting for user to select server...");
         try {
-            const SERVERS = await getProxyServers();
-            if (SERVERS.length === 0) {
-                throw new Error("No active proxy servers were found in the database.");
-            }
-
             const serverCounts = await getServerUsageCounts();
+            let serversToShow: string[] = [];
             
-            const validServerEntries = SERVERS
-                .map(server => ({ server, count: serverCounts[server] }))
-                .filter(entry => typeof entry.count === 'number') as { server: string, count: number }[];
-
-            let bestServer = SERVERS[0]; // Fallback to the first server
-
-            if (validServerEntries.length > 0) {
-                validServerEntries.sort((a, b) => a.count - b.count);
-                bestServer = validServerEntries[0].server;
-                console.log(`[Load Balancer] Selected server: ${bestServer} with ${validServerEntries[0].count} users.`);
+            if (user.batch_02 === 'batch_02') {
+                console.log("[Batch_02 User] Showing servers s6-s9.");
+                serversToShow = ['https://s6.monoklix.com', 'https://s7.monoklix.com', 'https://s8.monoklix.com', 'https://s9.monoklix.com'];
             } else {
-                console.warn('[Load Balancer] Could not get valid server counts. Falling back to default server:', bestServer);
+                console.log("[General User] Showing servers s1-s5.");
+                serversToShow = ['https://s1.monoklix.com', 'https://s2.monoklix.com', 'https://s3.monoklix.com', 'https://s4.monoklix.com', 'https://s5.monoklix.com'];
             }
 
-            sessionStorage.setItem('selectedProxyServer', bestServer);
-            updateUserProxyServer(user.id, bestServer); // Fire-and-forget update
-            
+            setServerOptions({ servers: serversToShow, usage: serverCounts });
+            setShowServerModal(true);
         } catch (error) {
-            console.error('[Load Balancer] Error during server selection. Using a hardcoded fallback.', error);
+            console.error('[Server Selection] Error during server selection setup. Using a hardcoded fallback.', error);
             const fallbackServer = 'https://s1.monoklix.com';
             sessionStorage.setItem('selectedProxyServer', fallbackServer);
             updateUserProxyServer(user.id, fallbackServer);
+            proceedWithPostLoginFlow(user);
         }
-    }
-    
-    // Instead of running the assignment logic here, set a state flag.
-    // A useEffect will pick up this flag after the re-render, ensuring all data is fresh.
-    if (user && !user.personalAuthToken) {
-        setNeedsTokenAssignment(true);
-    } else {
-        setJustLoggedIn(true);
     }
   };
 
@@ -685,6 +737,15 @@ const App: React.FC = () => {
   
   if (!currentUser) {
     return <LoginPage onLoginSuccess={handleLoginSuccess} />;
+  }
+
+  if (showServerModal) {
+    return <ServerSelectionModal
+        isOpen={true}
+        servers={serverOptions.servers}
+        serverUsage={serverOptions.usage}
+        onSelect={handleServerSelected}
+    />;
   }
 
   // --- Access Control Logic for Full Version ---
