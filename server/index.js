@@ -25,9 +25,6 @@ const log = (level, req, ...messages) => {
         if (tempMsg?.imageInput?.rawImageBytes?.length > 100) {
             tempMsg.imageInput.rawImageBytes = tempMsg.imageInput.rawImageBytes.substring(0, 50) + '...[TRUNCATED]';
         }
-         if (tempMsg?.requests?.[0]?.textInput?.prompt?.length > 200) {
-            tempMsg.requests[0].textInput.prompt = tempMsg.requests[0].textInput.prompt.substring(0, 200) + '...[TRUNCATED]';
-        }
         return JSON.stringify(tempMsg, null, 2);
       } catch (e) {
         return '[Unserializable Object]';
@@ -136,11 +133,7 @@ app.post('/api/veo/generate-i2v', async (req, res) => {
       return res.status(401).json({ error: 'No auth token provided' });
     }
 
-    if (req.body.requests?.[0]?.startImage?.mediaId) {
-      log('log', req, '📤 Has startImage with mediaId:', req.body.requests[0].startImage.mediaId);
-    }
-    log('log', req, '📤 Prompt:', req.body.requests?.[0]?.textInput?.prompt?.substring(0, 100) + '...');
-    log('log', req, '📤 Aspect ratio:', req.body.requests?.[0]?.aspectRatio);
+    log('log', req, '📦 Request body:', req.body);
     
     const response = await fetch(`${VEO_API_BASE}/video:batchAsyncGenerateVideoStartImage`, {
       method: 'POST',

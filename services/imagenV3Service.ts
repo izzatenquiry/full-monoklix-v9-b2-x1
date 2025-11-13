@@ -70,6 +70,10 @@ export const generateImageWithImagen = async (request: ImageGenerationRequest, o
   console.log(`🎨 [Imagen Service] Preparing generateImageWithImagen (T2I) request...`);
   const { prompt, config } = request;
   
+  const fullPrompt = config.negativePrompt ? `${prompt}, negative prompt: ${config.negativePrompt}` : prompt;
+  
+  console.debug(`[Imagen T2I Prompt Sent]\n---\n${fullPrompt}\n---`);
+
   const requestBody = {
       clientContext: {
           tool: 'BACKBONE',
@@ -79,7 +83,7 @@ export const generateImageWithImagen = async (request: ImageGenerationRequest, o
           imageModel: 'IMAGEN_3_5',
           aspectRatio: aspectRatioApiMap[config.aspectRatio || '1:1'] || "IMAGE_ASPECT_RATIO_SQUARE",
       },
-      prompt: config.negativePrompt ? `${prompt}, negative prompt: ${config.negativePrompt}` : prompt,
+      prompt: fullPrompt,
       mediaCategory: 'MEDIA_CATEGORY_SCENE',
       seed: config.seed || Math.floor(Math.random() * 2147483647),
   };
@@ -128,6 +132,8 @@ export const editOrComposeWithImagen = async (request: {
 }, onStatusUpdate?: (status: string) => void) => {
     console.log(`🎨➡️✏️ [Imagen Service] Starting editOrComposeWithImagen flow with ${request.images.length} images.`);
     
+    console.debug(`[Imagen Edit/Compose Prompt Sent]\n---\n${request.prompt}\n---`);
+
     const mediaIds = await Promise.all(
         request.images.map(img => uploadImageForImagen(img.base64, img.mimeType, request.config.authToken, onStatusUpdate))
     );

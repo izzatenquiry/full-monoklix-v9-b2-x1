@@ -21,7 +21,8 @@ const ConsoleLogSidebar: React.FC<ConsoleLogSidebarProps> = ({ isOpen, onClose }
 
   useEffect(() => {
     const handleLog = (data: LogEntry) => {
-      setLogs(prevLogs => [data, ...prevLogs].slice(0, 200)); // Keep max 200 logs
+      // Append new logs to the end, and keep max 200 logs by slicing from the end
+      setLogs(prevLogs => [...prevLogs, data].slice(-200));
     };
 
     eventBus.on('consoleLog', handleLog);
@@ -32,9 +33,9 @@ const ConsoleLogSidebar: React.FC<ConsoleLogSidebarProps> = ({ isOpen, onClose }
   }, []);
 
   useEffect(() => {
-    // Scroll to top when new logs are added
+    // Scroll to bottom when new logs are added
     if (logContainerRef.current) {
-      logContainerRef.current.scrollTop = 0;
+      logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight;
     }
   }, [logs]);
 

@@ -117,6 +117,7 @@ export const createChatSession = async (systemInstruction: string): Promise<Chat
  */
 export const streamChatResponse = async (chat: Chat, prompt: string) => {
     const model = `${MODELS.text} (stream)`;
+    console.debug(`[Chat Prompt Sent]\n---\n${prompt}\n---`);
 
     const apiCall = async () => {
         return await chat.sendMessageStream({ message: prompt });
@@ -213,6 +214,7 @@ export const generateVideo = async (
         const useStandardModel = !model.includes('fast');
         
         addLogEntry({ model, prompt, output: "Starting video generation via proxy...", tokenCount: 0, status: "Success" });
+        console.debug(`[Video Prompt Sent]\n---\n${prompt}\n---`);
         const { operations: initialOperations, successfulToken: generationToken } = await generateVideoWithVeo3({
             prompt,
             imageMediaId,
@@ -313,6 +315,8 @@ export const generateMultimodalContent = async (prompt: string, images: Multimod
             data: image.base64,
         },
     }));
+    
+    console.debug(`[Multimodal Prompt Sent]\n---\n${prompt}\n---`);
 
     const apiCall = async () => {
         const ai = getAiInstance();
@@ -365,6 +369,7 @@ export const generateMultimodalContent = async (prompt: string, images: Multimod
  */
 export const generateText = async (prompt: string): Promise<string> => {
     const model = MODELS.text;
+    console.debug(`[Text Prompt Sent]\n---\n${prompt}\n---`);
     
     const apiCall = async () => {
         const ai = getAiInstance();
@@ -415,6 +420,7 @@ export const generateText = async (prompt: string): Promise<string> => {
  */
 export const generateContentWithGoogleSearch = async (prompt: string): Promise<GenerateContentResponse> => {
     const model = MODELS.text;
+    console.debug(`[Google Search Prompt Sent]\n---\n${prompt}\n---`);
     
     const apiCall = async () => {
         const ai = getAiInstance();
@@ -514,6 +520,8 @@ export const generateVoiceOver = async (
         
         fullPrompt = `${languageInstruction}${moodInstruction}${script}`;
     }
+    
+    console.debug(`[Voice Over Prompt Sent]\n---\n${fullPrompt}\n---`);
 
     const apiCall = async () => {
         const ai = getAiInstance();
