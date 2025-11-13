@@ -218,6 +218,7 @@ const ImageGenerationView: React.FC<ImageGenerationViewProps> = ({ onCreateVideo
 
       } catch (e) {
           const userFriendlyMessage = handleApiError(e);
+          console.error(`Image Generation Failed (Slot ${index + 1}): ${userFriendlyMessage}`);
           setImages(prev => {
               const newImages = [...prev];
               newImages[index] = { error: userFriendlyMessage };
@@ -407,7 +408,7 @@ const ImageGenerationView: React.FC<ImageGenerationViewProps> = ({ onCreateVideo
                             <div className="text-center text-red-500 dark:text-red-400 p-4">
                                 <AlertTriangleIcon className="w-12 h-12 mx-auto mb-4" />
                                 <p className="font-semibold">Generation Failed</p>
-                                <p className="text-sm mt-2 max-w-md mx-auto">{selectedImage.error}</p>
+                                <p className="text-sm mt-2 max-w-md mx-auto text-neutral-500 dark:text-neutral-400">Please check the console for details and try again.</p>
                                 <button
                                     onClick={() => handleRetry(selectedImageIndex)}
                                     className="mt-6 flex items-center justify-center gap-2 bg-primary-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-primary-700 transition-colors"

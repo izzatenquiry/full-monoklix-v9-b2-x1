@@ -139,8 +139,8 @@ const VoiceStudioView: React.FC<VoiceStudioViewProps> = ({ language }) => {
                 result: blob,
             });
         } catch (e) {
-            const userFriendlyMessage = handleApiError(e);
-            setError(userFriendlyMessage);
+            handleApiError(e);
+            setError("Failed");
         } finally {
             setIsLoading(false);
         }
@@ -233,10 +233,10 @@ const VoiceStudioView: React.FC<VoiceStudioViewProps> = ({ language }) => {
         <>
             {isLoading && <div className="flex flex-col items-center justify-center h-full"><Spinner /><p className="mt-2 text-sm text-neutral-500">Generating audio, please wait...</p></div>}
             {error && (
-                <div className="text-center text-red-500 p-4">
+                <div className="text-center text-red-500 dark:text-red-400 p-4">
                     <AlertTriangleIcon className="w-12 h-12 mx-auto mb-4"/>
                     <p className="font-semibold">Generation Failed</p>
-                    <p className="text-sm mt-2 max-w-md mx-auto">{error}</p>
+                    <p className="text-sm mt-2 max-w-md mx-auto text-neutral-500 dark:text-neutral-400">Check console for details.</p>
                 </div>
             )}
             {audioUrl && audioBlob && (

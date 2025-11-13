@@ -130,8 +130,8 @@ const ProductAdView: React.FC<ProductAdViewProps> = ({ language }) => {
         result: result,
       });
     } catch (e) {
-      const userFriendlyMessage = handleApiError(e);
-      setError(userFriendlyMessage);
+      handleApiError(e);
+      setError("Failed"); // Set a generic state for UI, details are in console.
     } finally {
       setIsLoading(false);
     }
@@ -229,7 +229,7 @@ const ProductAdView: React.FC<ProductAdViewProps> = ({ language }) => {
                     Set Semula
                 </button>
             </div>
-            {error && <p className="text-red-500 dark:text-red-400 mt-2 text-center">{error}</p>}
+            {error && error !== 'Failed' && <p className="text-red-500 dark:text-red-400 mt-2 text-center">{error}</p>}
         </div>
       </>
   );

@@ -114,8 +114,8 @@ const StaffMonoklixView: React.FC<StaffMonoklixViewProps> = ({ language }) => {
                 result: result,
             });
         } catch (e) {
-            const userFriendlyMessage = handleApiError(e);
-            setError(userFriendlyMessage);
+            handleApiError(e);
+            setError("Failed");
         } finally {
             setIsLoading(false);
         }
@@ -213,7 +213,7 @@ const StaffMonoklixView: React.FC<StaffMonoklixViewProps> = ({ language }) => {
                         {T.resetButton}
                     </button>
                 </div>
-                {error && <p className="text-red-500 dark:text-red-400 mt-2 text-center">{error}</p>}
+                {error && error !== 'Failed' && <p className="text-red-500 dark:text-red-400 mt-2 text-center">{error}</p>}
             </div>
         </>
     );

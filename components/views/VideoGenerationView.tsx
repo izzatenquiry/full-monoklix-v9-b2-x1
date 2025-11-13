@@ -341,8 +341,8 @@ const VideoGenerationView: React.FC<VideoGenerationViewProps> = ({ preset, clear
               });
           }
       } catch (e) {
-          const userFriendlyMessage = handleApiError(e);
-          setError(userFriendlyMessage);
+          handleApiError(e);
+          setError("Failed");
       } finally {
           setIsLoading(false);
           setStatusMessage('');
@@ -532,7 +532,7 @@ const VideoGenerationView: React.FC<VideoGenerationViewProps> = ({ preset, clear
                     Reset
                 </button>
             </div>
-             {error && <p className="text-red-500 dark:text-red-400 mt-2 text-center">{error}</p>}
+             {error && error !== 'Failed' && <p className="text-red-500 dark:text-red-400 mt-2 text-center">{error}</p>}
         </div>
     </>
   );
@@ -549,7 +549,7 @@ const VideoGenerationView: React.FC<VideoGenerationViewProps> = ({ preset, clear
                <div className="text-center text-red-500 dark:text-red-400 p-4">
                    <AlertTriangleIcon className="w-12 h-12 mx-auto mb-4" />
                    <p className="font-semibold">Generation Failed</p>
-                   <p className="text-sm mt-2 max-w-md mx-auto">{error}</p>
+                   <p className="text-sm mt-2 max-w-md mx-auto text-neutral-500 dark:text-neutral-400">Please check the console for details.</p>
                    <button
                        onClick={handleGenerate}
                        className="mt-6 flex items-center justify-center gap-2 bg-primary-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-primary-700 mx-auto"

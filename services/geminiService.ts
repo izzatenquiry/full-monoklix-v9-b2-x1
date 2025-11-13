@@ -46,6 +46,48 @@ const getCurrentUserId = (): string | null => {
     return getCurrentUser()?.id ?? null;
 };
 
+const MAX_RETRIES = 5;
+
+/**
+ * A wrapper function to automatically retry an API call on failure.
+ * @param apiCall The asynchronous function to execute.
+ * @param onRetry A callback function triggered on each retry attempt.
+ * @returns The result of the successful API call.
+ * @throws The last error if all retry attempts fail.
+ */
+async function withRetry<T>(
+  apiCall: () => Promise<T>, 
+  onRetry: (attempt: number, error: any) => void
+): Promise<T> {
+  let lastError: any;
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      return await apiCall();
+    } catch (error) {
+      lastError = error;
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const lowerCaseMessage = errorMessage.toLowerCase();
+
+      // Don't retry on client-side errors like safety blocks or bad requests.
+      // Do retry on server errors (5xx) or network issues.
+      if (lowerCaseMessage.includes('safety') || 
+          (error as any)?.status === 400 ||
+          (error as any)?.status === 404) {
+        console.log("Non-retriable error detected, throwing immediately.", error);
+        throw lastError;
+      }
+      
+      if (attempt < MAX_RETRIES) {
+        onRetry(attempt, error);
+        // Exponential backoff
+        await new Promise(res => setTimeout(res, 1000 * attempt)); 
+      }
+    }
+  }
+  throw lastError;
+}
+
+
 export interface MultimodalContent {
     base64: string;
     mimeType: string;
@@ -74,10 +116,28 @@ export const createChatSession = async (systemInstruction: string): Promise<Chat
  * @returns {Promise<AsyncGenerator<GenerateContentResponse>>} The streaming response from the model.
  */
 export const streamChatResponse = async (chat: Chat, prompt: string) => {
+    const model = `${MODELS.text} (stream)`;
+
+    const apiCall = async () => {
+        return await chat.sendMessageStream({ message: prompt });
+    };
+    
     try {
-        const stream = await chat.sendMessageStream({ message: prompt });
+        const stream = await withRetry(apiCall, (attempt, error) => {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            console.warn(`Attempt ${attempt} to start streamChatResponse failed: ${errorMessage}. Retrying...`);
+            addLogEntry({
+                model,
+                prompt: `${prompt} (Retry ${attempt}/${MAX_RETRIES})`,
+                output: `Attempt ${attempt} to start stream failed. Retrying...`,
+                tokenCount: 0,
+                status: 'Error',
+                error: `Retry ${attempt}: ${errorMessage}`
+            });
+        });
+        
         addLogEntry({
-            model: `${MODELS.text} (stream)`,
+            model,
             prompt,
             output: 'Streaming response started...',
             tokenCount: 0, 
@@ -87,9 +147,9 @@ export const streamChatResponse = async (chat: Chat, prompt: string) => {
     } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
         addLogEntry({
-            model: `${MODELS.text} (stream)`,
+            model,
             prompt,
-            output: `Error: ${errorMessage}`,
+            output: `Error starting stream after ${MAX_RETRIES} attempts: ${errorMessage}`,
             tokenCount: 0,
             status: 'Error',
             error: errorMessage
@@ -246,29 +306,45 @@ export const generateVideo = async (
  */
 export const generateMultimodalContent = async (prompt: string, images: MultimodalContent[]): Promise<string> => {
     const model = MODELS.text;
-    try {
-        const ai = getAiInstance();
-        const textPart = { text: prompt };
-        const imageParts = images.map(image => ({
-            inlineData: {
-                mimeType: image.mimeType,
-                data: image.base64,
-            },
-        }));
+    const textPart = { text: prompt };
+    const imageParts = images.map(image => ({
+        inlineData: {
+            mimeType: image.mimeType,
+            data: image.base64,
+        },
+    }));
 
-        const response = await ai.models.generateContent({
+    const apiCall = async () => {
+        const ai = getAiInstance();
+        return await ai.models.generateContent({
             model,
             contents: { parts: [...imageParts, textPart] },
             config: {
                 thinkingConfig: { thinkingBudget: 0 },
             }
         });
-        
-        const textOutput = response.text ?? '';
+    };
+    
+    const logPrompt = `${prompt} [${images.length} image(s)]`;
 
+    try {
+        const response = await withRetry(apiCall, (attempt, error) => {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            console.warn(`Attempt ${attempt} for generateMultimodalContent failed: ${errorMessage}. Retrying...`);
+            addLogEntry({
+                model,
+                prompt: `${logPrompt} (Retry ${attempt}/${MAX_RETRIES})`,
+                output: `Attempt ${attempt} failed. Retrying...`,
+                tokenCount: 0,
+                status: 'Error',
+                error: `Retry ${attempt}: ${errorMessage}`
+            });
+        });
+
+        const textOutput = response.text ?? '';
         addLogEntry({
             model,
-            prompt: `${prompt} [${images.length} image(s)]`,
+            prompt: logPrompt,
             output: textOutput,
             tokenCount: response.usageMetadata?.totalTokenCount ?? 0,
             status: 'Success'
@@ -277,7 +353,7 @@ export const generateMultimodalContent = async (prompt: string, images: Multimod
         return textOutput;
     } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
-        addLogEntry({ model, prompt: `${prompt} [${images.length} image(s)]`, output: `Error: ${errorMessage}`, tokenCount: 0, status: 'Error', error: errorMessage });
+        addLogEntry({ model, prompt: logPrompt, output: `Error after ${MAX_RETRIES} attempts: ${errorMessage}`, tokenCount: 0, status: 'Error', error: errorMessage });
         throw error;
     }
 };
@@ -289,18 +365,33 @@ export const generateMultimodalContent = async (prompt: string, images: Multimod
  */
 export const generateText = async (prompt: string): Promise<string> => {
     const model = MODELS.text;
-    try {
+    
+    const apiCall = async () => {
         const ai = getAiInstance();
-        const response = await ai.models.generateContent({
+        return await ai.models.generateContent({
             model,
             contents: { parts: [{ text: prompt }] },
             config: {
                 thinkingConfig: { thinkingBudget: 0 },
             }
         });
-        
-        const textOutput = response.text ?? '';
+    };
 
+    try {
+        const response = await withRetry(apiCall, (attempt, error) => {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            console.warn(`Attempt ${attempt} for generateText failed: ${errorMessage}. Retrying...`);
+            addLogEntry({
+                model,
+                prompt: `${prompt.substring(0, 100)}... (Retry ${attempt}/${MAX_RETRIES})`,
+                output: `Attempt ${attempt} failed. Retrying...`,
+                tokenCount: 0,
+                status: 'Error',
+                error: `Retry ${attempt}: ${errorMessage}`
+            });
+        });
+
+        const textOutput = response.text ?? '';
         addLogEntry({
             model,
             prompt,
@@ -312,7 +403,7 @@ export const generateText = async (prompt: string): Promise<string> => {
         return textOutput;
     } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
-        addLogEntry({ model, prompt, output: `Error: ${errorMessage}`, tokenCount: 0, status: 'Error', error: errorMessage });
+        addLogEntry({ model, prompt, output: `Error after ${MAX_RETRIES} attempts: ${errorMessage}`, tokenCount: 0, status: 'Error', error: errorMessage });
         throw error;
     }
 };
@@ -324,9 +415,10 @@ export const generateText = async (prompt: string): Promise<string> => {
  */
 export const generateContentWithGoogleSearch = async (prompt: string): Promise<GenerateContentResponse> => {
     const model = MODELS.text;
-    try {
+    
+    const apiCall = async () => {
         const ai = getAiInstance();
-        const response = await ai.models.generateContent({
+        return await ai.models.generateContent({
             model,
             contents: { parts: [{ text: prompt }] },
             config: {
@@ -334,9 +426,23 @@ export const generateContentWithGoogleSearch = async (prompt: string): Promise<G
                 thinkingConfig: { thinkingBudget: 0 },
             },
         });
+    };
 
+    try {
+        const response = await withRetry(apiCall, (attempt, error) => {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            console.warn(`Attempt ${attempt} for generateContentWithGoogleSearch failed: ${errorMessage}. Retrying...`);
+            addLogEntry({
+                model: `${model} (Search)`,
+                prompt: `${prompt} (Retry ${attempt}/${MAX_RETRIES})`,
+                output: `Attempt ${attempt} failed. Retrying...`,
+                tokenCount: 0,
+                status: 'Error',
+                error: `Retry ${attempt}: ${errorMessage}`
+            });
+        });
+        
         const textOutput = response.text ?? '';
-
         addLogEntry({
             model,
             prompt,
@@ -348,7 +454,7 @@ export const generateContentWithGoogleSearch = async (prompt: string): Promise<G
         return response; // Return the whole object
     } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
-        addLogEntry({ model, prompt, output: `Error: ${errorMessage}`, tokenCount: 0, status: 'Error', error: errorMessage });
+        addLogEntry({ model, prompt, output: `Error after ${MAX_RETRIES} attempts: ${errorMessage}`, tokenCount: 0, status: 'Error', error: errorMessage });
         throw error;
     }
 };
@@ -374,46 +480,44 @@ export const generateVoiceOver = async (
         ? `Sing: ${musicStyle}, Voice: ${actorId}, Lang: ${language}, Script: ${script.substring(0, 100)}...`
         : `Voice: ${actorId}, Lang: ${language}, Mood: ${mood}, Script: ${script.substring(0, 100)}...`;
     
-    try {
-        const ai = getAiInstance();
+    let fullPrompt = '';
 
-        let fullPrompt = '';
-
-        if (generationMode === 'sing') {
-            let singInstruction = `Sing the following lyrics in a ${musicStyle || 'pop'} music style`;
-            if (language === 'Bahasa Melayu') {
-                singInstruction = `Nyanyikan lirik berikut dalam gaya muzik ${musicStyle || 'pop'} dalam Bahasa Melayu`;
-            }
-            fullPrompt = `${singInstruction}: "${script}"`;
-        } else { // 'speak'
-            const moodInstructionMap: { [key: string]: string } = {
-                'Normal': '',
-                'Ceria': 'Say cheerfully: ',
-                'Semangat': 'Say with an energetic and enthusiastic tone: ',
-                'Jualan': 'Say in a persuasive and compelling sales tone: ',
-                'Sedih': 'Say in a sad and melancholic tone: ',
-                'Berbisik': 'Say in a whispering tone: ',
-                'Marah': 'Say in an angry tone: ',
-                'Tenang': 'Say in a calm and soothing tone: ',
-                'Rasmi': 'Say in a formal and professional tone: ',
-                'Teruja': 'Say in an excited tone: ',
-                'Penceritaan': 'Say in a storytelling tone: ',
-                'Berwibawa': 'Say in an authoritative and firm tone: ',
-                'Mesra': 'Say in a friendly and warm tone: '
-            };
-            
-            const moodInstruction = moodInstructionMap[mood as keyof typeof moodInstructionMap] || '';
-            
-            let languageInstruction = '';
-            if (language === 'Bahasa Melayu') {
-                languageInstruction = 'Sebutkan yang berikut dalam Bahasa Melayu yang jelas: ';
-            }
-            
-            fullPrompt = `${languageInstruction}${moodInstruction}${script}`;
+    if (generationMode === 'sing') {
+        let singInstruction = `Sing the following lyrics in a ${musicStyle || 'pop'} music style`;
+        if (language === 'Bahasa Melayu') {
+            singInstruction = `Nyanyikan lirik berikut dalam gaya muzik ${musicStyle || 'pop'} dalam Bahasa Melayu`;
         }
+        fullPrompt = `${singInstruction}: "${script}"`;
+    } else { // 'speak'
+        const moodInstructionMap: { [key: string]: string } = {
+            'Normal': '',
+            'Ceria': 'Say cheerfully: ',
+            'Semangat': 'Say with an energetic and enthusiastic tone: ',
+            'Jualan': 'Say in a persuasive and compelling sales tone: ',
+            'Sedih': 'Say in a sad and melancholic tone: ',
+            'Berbisik': 'Say in a whispering tone: ',
+            'Marah': 'Say in an angry tone: ',
+            'Tenang': 'Say in a calm and soothing tone: ',
+            'Rasmi': 'Say in a formal and professional tone: ',
+            'Teruja': 'Say in an excited tone: ',
+            'Penceritaan': 'Say in a storytelling tone: ',
+            'Berwibawa': 'Say in an authoritative and firm tone: ',
+            'Mesra': 'Say in a friendly and warm tone: '
+        };
+        
+        const moodInstruction = moodInstructionMap[mood as keyof typeof moodInstructionMap] || '';
+        
+        let languageInstruction = '';
+        if (language === 'Bahasa Melayu') {
+            languageInstruction = 'Sebutkan yang berikut dalam Bahasa Melayu yang jelas: ';
+        }
+        
+        fullPrompt = `${languageInstruction}${moodInstruction}${script}`;
+    }
 
-
-        const response = await ai.models.generateContent({
+    const apiCall = async () => {
+        const ai = getAiInstance();
+        return await ai.models.generateContent({
             model: "gemini-2.5-flash-preview-tts",
             contents: [{ parts: [{ text: fullPrompt }] }],
             config: {
@@ -424,6 +528,21 @@ export const generateVoiceOver = async (
                     },
                 },
             },
+        });
+    };
+    
+    try {
+        const response = await withRetry(apiCall, (attempt, error) => {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            console.warn(`Attempt ${attempt} for generateVoiceOver failed: ${errorMessage}. Retrying...`);
+            addLogEntry({
+                model,
+                prompt: `${webhookPrompt} (Retry ${attempt}/${MAX_RETRIES})`,
+                output: `Attempt ${attempt} failed. Retrying...`,
+                tokenCount: 0,
+                status: 'Error',
+                error: `Retry ${attempt}: ${errorMessage}`
+            });
         });
 
         const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
@@ -453,7 +572,7 @@ export const generateVoiceOver = async (
         addLogEntry({
             model,
             prompt: webhookPrompt,
-            output: `Error: ${errorMessage}`,
+            output: `Error after ${MAX_RETRIES} attempts: ${errorMessage}`,
             tokenCount: 0,
             status: 'Error',
             error: errorMessage

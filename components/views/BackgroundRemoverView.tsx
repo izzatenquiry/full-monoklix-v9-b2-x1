@@ -115,8 +115,8 @@ const BackgroundRemoverView: React.FC<BackgroundRemoverViewProps> = ({ onReEdit,
         setError("The AI was unable to remove the background. Please try a different image.");
       }
     } catch (e) {
-      const userFriendlyMessage = handleApiError(e);
-      setError(userFriendlyMessage);
+      handleApiError(e);
+      setError("Failed"); // Set a generic state for UI, details are in console.
     } finally {
       setIsLoading(false);
     }
@@ -160,7 +160,7 @@ const BackgroundRemoverView: React.FC<BackgroundRemoverViewProps> = ({ onReEdit,
               Reset
             </button>
           </div>
-          {error && <p className="text-red-500 dark:text-red-400 mt-2 text-center">{error}</p>}
+          {error && error !== 'Failed' && <p className="text-red-500 dark:text-red-400 mt-2 text-center">{error}</p>}
       </div>
     </>
   );

@@ -66,7 +66,6 @@ const getCurrentUserInternal = (): User | null => {
     return null;
 };
 
-
 export const executeProxiedRequest = async (
   endpoint: string,
   requestBody: any,
@@ -75,8 +74,7 @@ export const executeProxiedRequest = async (
   onStatusUpdate?: (status: string) => void
 ): Promise<{ data: any; successfulToken: string }> => {
   console.log(`[API Client] Starting process for: ${logContext}`);
-  const currentUser = getCurrentUserInternal();
-
+  
   // --- Per-Server Queueing Logic ---
   const isGenerationRequest = logContext.includes('GENERATE') || logContext.includes('RECIPE');
   if (isGenerationRequest) {
@@ -109,29 +107,26 @@ export const executeProxiedRequest = async (
     if (onStatusUpdate) onStatusUpdate('Slot berjaya diperoleh. Memulakan penjanaan...');
   }
   // --- End Queueing Logic ---
-
-  let tokenToUse: { token: string; createdAt: string; } | null = null;
-  let tokenIdentifier: string;
-
-  if (specificToken) {
-    console.log(`[API Client] Using specific token provided for ${logContext}`);
-    tokenIdentifier = 'Provided Token';
-    tokenToUse = { token: specificToken, createdAt: 'specific' };
-  } else {
-    tokenToUse = getPersonalToken();
-    tokenIdentifier = 'Personal Token';
-    if (!tokenToUse) {
-        console.error(`[API Client] Aborting ${logContext}: No personal auth token found for the current user.`);
-        throw new Error(`Personal Auth Token is required for ${logContext}, but none was found. Please re-login or check your account.`);
-    }
-    console.log(`[API Client] Using user's personal token for ${logContext}`);
-  }
-
-  if (onStatusUpdate) onStatusUpdate(`Attempting generation with ${tokenIdentifier}...`);
-  console.log(`[API Client] Attempting ${logContext} with ${tokenIdentifier} (...${tokenToUse.token.slice(-6)})`);
-  addLogEntry({ model: logContext, prompt: `Attempt with ${tokenIdentifier}`, output: `...${tokenToUse.token.slice(-6)}`, tokenCount: 0, status: "Success" });
-
+  
   try {
+    let tokenToUse: { token: string; createdAt: string; } | null = null;
+    let tokenIdentifier: string;
+
+    if (specificToken) {
+      tokenToUse = { token: specificToken, createdAt: 'specific' };
+      tokenIdentifier = 'Provided Token';
+    } else {
+      tokenToUse = getPersonalToken();
+      if (!tokenToUse) {
+        throw new Error(`Personal Auth Token is required for ${logContext}, but none was found.`);
+      }
+      tokenIdentifier = 'Personal Token';
+    }
+    
+    const currentUser = getCurrentUserInternal();
+    if (onStatusUpdate) onStatusUpdate(`Attempting generation with ${tokenIdentifier}...`);
+    console.log(`[API Client] Attempting ${logContext} with ${tokenIdentifier} (...${tokenToUse.token.slice(-6)})`);
+    
     const response = await fetch(endpoint, {
       method: 'POST',
       headers: {
@@ -142,7 +137,7 @@ export const executeProxiedRequest = async (
       body: JSON.stringify(requestBody),
     });
 
-    const data = await response.json();
+    const data = await response.json().catch(() => ({ error: { message: `Proxy returned non-JSON response (${response.status})` } }));
     console.log(`[API Client] Response for ${logContext} with ${tokenIdentifier}. Status: ${response.status}`);
 
     if (!response.ok) {
@@ -150,14 +145,13 @@ export const executeProxiedRequest = async (
       throw new Error(errorMessage);
     }
     
-    console.log(`✅ [API Client] Success for ${logContext} with ${tokenIdentifier}`);
+    console.log(`✅ [API Client] Success for ${logContext}`);
     return { data, successfulToken: tokenToUse.token };
 
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    console.error(`❌ [API Client] ${tokenIdentifier} failed for ${logContext}:`, errorMessage);
-    addLogEntry({ model: logContext, prompt: `${tokenIdentifier} failed`, output: errorMessage, tokenCount: 0, status: 'Error', error: errorMessage });
-    
+    console.error(`❌ [API Client] Request failed for ${logContext}:`, errorMessage);
+    addLogEntry({ model: logContext, prompt: `Request failed`, output: errorMessage, tokenCount: 0, status: 'Error', error: errorMessage });
     throw error;
   }
 };

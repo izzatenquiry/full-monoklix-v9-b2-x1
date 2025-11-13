@@ -79,8 +79,8 @@ const ContentIdeasView: React.FC<ContentIdeasViewProps> = ({ language }) => {
                 result: result.text ?? '',
             });
         } catch (e) {
-            const userFriendlyMessage = handleApiError(e);
-            setError(userFriendlyMessage);
+            handleApiError(e);
+            setError("Failed");
         } finally {
             setIsLoading(false);
         }
@@ -150,7 +150,7 @@ const ContentIdeasView: React.FC<ContentIdeasViewProps> = ({ language }) => {
                         Reset
                     </button>
                 </div>
-                {error && <p className="text-red-500 dark:text-red-400 mt-2 text-center">{error}</p>}
+                {error && error !== 'Failed' && <p className="text-red-500 dark:text-red-400 mt-2 text-center">{error}</p>}
             </div>
         </>
     );

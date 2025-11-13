@@ -61,7 +61,7 @@ interface TiktokAffiliateViewProps {
 
 const modelFaceOptions = ["Random", "Malaysian", "Vietnamese", "English", "American", "Arabic", "Russian", "Japanese", "Korean", "Thai"];
 const lightingOptions = ["Random", "Soft Daylight", "Golden Hour", "Hard Light", "Window Backlight", "Warm Lamp Light", "Mixed Light", "Studio Light", "Dramatic", "Natural Light", "Neon", "Backlight", "Side Lighting"];
-const cameraOptions = ["Random", "Detail / Macro", "Close-up", "Medium Close-up", "Medium / Half Body", "Three-Quarter", "Full Body", "Flatlay", "Wide Shot", "Medium Shot", "Long Shot", "Dutch Angle", "Low Angle", "High Angle", "Overhead Shot"];
+const cameraOptions = ["Random", "Detail / Macro", "Close-up", "Medium Close-up", "Medium / Half-Body", "Three-Quarter", "Full Body", "Flatlay", "Wide Shot", "Medium Shot", "Long Shot", "Dutch Angle", "Low Angle", "High Angle", "Overhead Shot"];
 const poseOptions = ["Random", "Professional Model Pose", "Casual Standing", "Sitting on Edge of Chair", "Slow Walking", "Leaning on Wall", "Half-Body Turn"];
 const vibeOptions = [ "Random", "Studio", "Bedroom", "Bathroom / Vanity", "Living Room", "Kitchen / Dining", "Workspace / Study", "Entryway / Laundry", "Clean Urban", "Aesthetic Coffee Shop", "City Night", "Tropical Beach", "Luxury Apartment", "Flower Garden", "Old Building", "Classic Library", "Minimalist Studio", "Rooftop Bar", "Autumn Park", "Tokyo Street", "Scandinavian Interior", "Enchanted Forest", "Cyberpunk City", "Bohemian Desert", "Modern Art Gallery", "Sunset Rooftop", "Snowy Mountain Cabin", "Industrial Loft", "Futuristic Lab", "Pastel Dreamscape", "Palace Interior", "Cottagecore Kitchen", "Coral Reef", "Parisian Street", "Asian Night Market", "Yacht Deck", "Vintage Train Station", "Outdoor Basketball Court", "Professional Kitchen", "Luxury Hotel Lobby", "Rock Concert Stage", "Zen Garden", "Mediterranean Villa Terrace", "Outer Space / Sci-Fi", "Modern Workspace", "Hot Spring", "Fantasy Throne Room", "Skyscraper Summit", "Sports Car Garage", "Botanical Greenhouse", "Ice Rink", "Classical Dance Studio", "Night Beach Party", "Ancient Library", "Mountain View Deck", "Modern Dance Studio", "Speakeasy Bar", "Rainforest Trail", "Terraced Rice Paddy" ];
 const styleOptions = ["Random", "Realism", "Photorealistic", "Cinematic", "Anime", "Vintage", "3D Animation", "Watercolor", "Claymation"];
@@ -213,6 +213,7 @@ const TiktokAffiliateView: React.FC<TiktokAffiliateViewProps> = ({ onReEdit, onC
             });
         } catch (e) {
             const userFriendlyMessage = handleApiError(e);
+            console.error(`Tiktok Affiliate Image Generation Failed: ${userFriendlyMessage}`);
             setImages(prev => {
                 const newImages = [...prev];
                 newImages[index] = { error: userFriendlyMessage };
@@ -389,7 +390,7 @@ const TiktokAffiliateView: React.FC<TiktokAffiliateViewProps> = ({ onReEdit, onC
                                 <div className="text-center text-red-500 dark:text-red-400 p-4">
                                     <AlertTriangleIcon className="w-12 h-12 mx-auto mb-4" />
                                     <p className="font-semibold">Generation Failed</p>
-                                    <p className="text-sm mt-2 max-w-md mx-auto">{selectedImage.error}</p>
+                                    <p className="text-sm mt-2 max-w-md mx-auto text-neutral-500 dark:text-neutral-400">Please check the console for details.</p>
                                     <button
                                         onClick={() => handleRetry(selectedImageIndex)}
                                         className="mt-6 flex items-center justify-center gap-2 bg-primary-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-primary-700 transition-colors"
