@@ -11,7 +11,7 @@ import LoginPage from './LoginPage';
 import GalleryView from './components/views/GalleryView';
 import WelcomeAnimation from './components/WelcomeAnimation';
 import LibraryView from './components/views/LibraryView';
-import { MenuIcon, LogoIcon, XIcon, SunIcon, MoonIcon, CheckCircleIcon, AlertTriangleIcon, PartyPopperIcon, RefreshCwIcon, UsersIcon, ServerIcon, ShieldCheckIcon, TerminalIcon } from './components/Icons';
+import { MenuIcon, LogoIcon, XIcon, SunIcon, MoonIcon, CheckCircleIcon, AlertTriangleIcon, PartyPopperIcon, RefreshCwIcon, UsersIcon, ServerIcon, ShieldCheckIcon, TerminalIcon, SparklesIcon, ChevronRightIcon } from './components/Icons';
 import { signOutUser, logActivity, getVeoAuthTokens, getSharedMasterApiKey, updateUserLastSeen, assignPersonalTokenAndIncrementUsage, saveUserPersonalAuthToken, getServerUsageCounts, updateUserProxyServer, updateTokenStatusToExpired } from './services/userService';
 import { createChatSession, streamChatResponse } from './services/geminiService';
 import Spinner from './components/common/Spinner';
@@ -157,16 +157,29 @@ const ServerSelectionModal: React.FC<ServerSelectionModalProps> = ({ isOpen, ser
         if (count < 20) return 'text-yellow-500';
         return 'text-red-500';
     };
+
+    const handleAutoSelect = () => {
+        if (servers.length === 0) return;
+
+        // Find the server with the minimum usage
+        const leastBusyServer = servers.reduce((leastBusy, currentServer) => {
+            const leastBusyUsage = serverUsage[leastBusy] || 0;
+            const currentUsage = serverUsage[currentServer] || 0;
+            return currentUsage < leastBusyUsage ? currentServer : leastBusy;
+        }, servers[0]);
+
+        onSelect(leastBusyServer);
+    };
     
     if (!isOpen) return null;
 
     return (
         <div className="fixed inset-0 bg-neutral-100 dark:bg-neutral-900 flex items-center justify-center p-4 z-50 animate-zoomIn">
-            <div className="w-full max-w-2xl text-center">
+            <div className="w-full max-w-md text-center">
                 <h1 className="text-3xl font-bold mb-2">{T.title}</h1>
                 <p className="text-neutral-500 dark:text-neutral-400 mb-8">{T.subtitle}</p>
 
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                <div className="flex flex-col gap-3">
                     {servers.map(serverUrl => {
                         const usage = serverUsage[serverUrl] || 0;
                         const serverName = serverUrl.replace('https://', '').replace('.monoklix.com', '');
@@ -174,17 +187,33 @@ const ServerSelectionModal: React.FC<ServerSelectionModalProps> = ({ isOpen, ser
                             <button
                                 key={serverUrl}
                                 onClick={() => onSelect(serverUrl)}
-                                className="p-6 bg-white dark:bg-neutral-800 rounded-lg shadow-md border border-transparent hover:border-primary-500 hover:shadow-xl transform hover:-translate-y-1 transition-all"
+                                className="w-full flex items-center p-4 bg-white dark:bg-neutral-800 rounded-lg shadow-md border border-transparent hover:border-primary-500 hover:shadow-lg transition-all group"
                             >
-                                <ServerIcon className="w-10 h-10 mx-auto text-primary-500 mb-3" />
-                                <p className="font-bold text-lg capitalize">{T.server} {serverName.toUpperCase()}</p>
-                                <div className={`flex items-center justify-center gap-2 text-sm mt-1 font-semibold ${getUsageColor(usage)}`}>
+                                <ServerIcon className="w-8 h-8 text-primary-500" />
+                                <div className="flex-1 ml-4 text-left">
+                                    <p className="font-bold text-lg capitalize">{T.server} {serverName.toUpperCase()}</p>
+                                </div>
+                                <div className={`flex items-center justify-center gap-2 text-sm font-semibold mr-2 ${getUsageColor(usage)}`}>
                                     <UsersIcon className="w-4 h-4" />
                                     <span>{usage} Users</span>
                                 </div>
+                                <ChevronRightIcon className="w-6 h-6 text-neutral-400 group-hover:text-primary-500 transition-colors" />
                             </button>
                         );
                     })}
+
+                    {/* Auto Select Button */}
+                    <button
+                        onClick={handleAutoSelect}
+                        className="w-full flex items-center p-4 mt-4 bg-primary-600 text-white rounded-lg shadow-lg hover:bg-primary-700 transition-all group"
+                    >
+                        <SparklesIcon className="w-8 h-8" />
+                        <div className="flex-1 ml-4 text-left">
+                            <p className="font-bold text-lg">Auto Select</p>
+                            <p className="text-sm opacity-80">Connect to the fastest server</p>
+                        </div>
+                        <ChevronRightIcon className="w-6 h-6 text-white/70 group-hover:text-white transition-colors" />
+                    </button>
                 </div>
             </div>
         </div>
