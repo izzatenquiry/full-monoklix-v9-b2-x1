@@ -1,11 +1,39 @@
-import React from 'react';
+import React, { useState, useCallback } from 'react';
 import { 
     CheckCircleIcon, XIcon, InformationCircleIcon, KeyIcon, CreditCardIcon, LightbulbIcon,
     ImageIcon, VideoIcon, MegaphoneIcon, RobotIcon, LibraryIcon, SettingsIcon,
-    GalleryIcon, AlertTriangleIcon
+    GalleryIcon, AlertTriangleIcon, ChevronLeftIcon, ChevronRightIcon
 } from '../Icons';
 // FIX: Add missing Language type for component props.
 import { type Language } from '../../types';
+
+
+// --- Video Slideshow Data ---
+// User: You can replace the title and src for each video below.
+// Place your video files in a 'public/videos' folder if they don't exist.
+const slideshowVideos = [
+  {
+    title: "Video 1: Platform Overview",
+    src: "https://monoklix.com/wp-content/uploads/2025/11/WhatsApp-Video-2025-11-13-at-10.41.36-PM.mp4",
+  },
+  {
+    title: "Video 2: AI Image Suite",
+    src: "https://monoklix.com/wp-content/uploads/2025/11/WhatsApp-Video-2025-11-13-at-10.41.37-PM.mp4",
+  },
+  {
+    title: "Video 3: AI Video Suite",
+    src: "https://monoklix.com/wp-content/uploads/2025/11/WhatsApp-Video-2025-11-13-at-10.41.37-PM-1.mp4",
+  },
+  {
+    title: "Video 4: Content Ideas",
+    src: "https://monoklix.com/wp-content/uploads/2025/11/WhatsApp-Video-2025-11-13-at-10.41.36-PM-1.mp4",
+  },
+  {
+    title: "Video 5: Prompt Gallery",
+    src: "https://monoklix.com/wp-content/uploads/2025/11/WhatsApp-Video-2025-11-13-at-10.41.37-PM-2.mp4",
+  },
+];
+
 
 const Section: React.FC<{ title: string; children: React.ReactNode; icon?: React.ComponentType<{ className?: string }> }> = ({ title, children, icon: Icon }) => (
     <div className="py-6 border-b border-neutral-200 dark:border-neutral-800 last:border-b-0">
@@ -30,9 +58,72 @@ interface GetStartedViewProps {
 }
 
 const GetStartedView: React.FC<GetStartedViewProps> = () => {
+    const [currentSlide, setCurrentSlide] = useState(0);
+
+    const nextSlide = useCallback(() => {
+        setCurrentSlide(prev => (prev === slideshowVideos.length - 1 ? 0 : prev + 1));
+    }, []);
+
+    const prevSlide = useCallback(() => {
+        setCurrentSlide(prev => (prev === 0 ? slideshowVideos.length - 1 : prev - 1));
+    }, []);
+
+    const goToSlide = (index: number) => {
+        setCurrentSlide(index);
+    };
+
 
     return (
         <div className="max-w-7xl mx-auto">
+            {/* Video Slideshow Section */}
+            <div className="mb-10 bg-white dark:bg-neutral-900 p-6 rounded-lg shadow-lg">
+                <h2 className="text-2xl font-bold mb-4 text-neutral-800 dark:text-white">Video Tutorials</h2>
+                <div className="relative group">
+                    <video 
+                        key={slideshowVideos[currentSlide].src} 
+                        src={slideshowVideos[currentSlide].src} 
+                        controls 
+                        autoPlay 
+                        muted 
+                        loop 
+                        playsInline
+                        className="w-full aspect-video rounded-md bg-black shadow-inner"
+                    />
+                    
+                    {/* Navigation Buttons */}
+                    <button 
+                        onClick={prevSlide} 
+                        className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/40 text-white p-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/70 focus:outline-none focus:ring-2 focus:ring-white"
+                        aria-label="Previous video"
+                    >
+                        <ChevronLeftIcon className="w-6 h-6"/>
+                    </button>
+                    <button 
+                        onClick={nextSlide} 
+                        className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/40 text-white p-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/70 focus:outline-none focus:ring-2 focus:ring-white"
+                        aria-label="Next video"
+                    >
+                        <ChevronRightIcon className="w-6 h-6"/>
+                    </button>
+                </div>
+                <div className="mt-4 text-center">
+                    <h3 className="font-bold text-neutral-800 dark:text-white">{slideshowVideos[currentSlide].title}</h3>
+                    
+                    {/* Slide Indicators */}
+                    <div className="flex justify-center gap-2 mt-3">
+                        {slideshowVideos.map((_, index) => (
+                            <button 
+                                key={index} 
+                                onClick={() => goToSlide(index)}
+                                className={`w-3 h-3 rounded-full transition-colors ${currentSlide === index ? 'bg-primary-500' : 'bg-neutral-300 dark:bg-neutral-600 hover:bg-neutral-400'}`}
+                                aria-label={`Go to video ${index + 1}`}
+                            />
+                        ))}
+                    </div>
+                </div>
+            </div>
+
+
             <div className="text-left mb-10">
                 <h1 className="text-3xl font-extrabold text-neutral-900 dark:text-white sm:text-4xl">
                     Panduan Mula
